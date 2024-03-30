@@ -39,7 +39,7 @@ Every time the client sends a message, it gets handled by a function in the corr
    ;; :documentFormattingProvider nil
    ;; :documentRangeFormattingProvider nil
    ;; :documentOnTypeFormattingProvider nil
-   :renameProvider {:workDoneProgress false}})
+   :renameProvider {:workDoneProgress false}
    ;; :foldingRangeProvider nil
    ;; :executeCommandProvider nil
    ;; :selectionRangeProvider nil
@@ -49,7 +49,7 @@ Every time the client sends a message, it gets handled by a function in the corr
    ;; :monikerProvider nil
    ;; :typeHierarchyProvider nil
    ;; :inlineValueProvider nil
-   ;; :inlayHintProvider nil
+   :inlayHintProvider {:workDoneProgress false}})
    ;; ;; this is for PULL diagnostics, but fennel-ls currently does PUSH diagnostics
    ;; :diagnosticProvider {:workDoneProgress false}})
    ;; :workspaceSymbolProvider nil
@@ -204,8 +204,6 @@ Every time the client sends a message, it gets handled by a function in the corr
             (set completion.textEdit.range input-range)))
         ?completions))))
 
-
-
 (λ requests.textDocument/rename [self send {: position :textDocument {: uri} :newName new-name}]
   (let [file (state.get-by-uri self uri)
         byte (utils.position->byte file.text position self.position-encoding)]
@@ -228,6 +226,60 @@ Every time the client sends a message, it gets handled by a function in the corr
               (utils.position->byte definition.file.text $2.range.start :utf-8)))
         {:changes {definition.file.uri usages}})
       (catch _ nil))))
+
+(λ requests.textDocument/inlayHint [self send {:textDocument {: uri} : range}]
+  ;; TODO: already done somewhere?
+  (λ deep-find [ast cool? ?depth]
+    (local depth (or ?depth 0))
+    (if
+      ;; bottom of ast
+      (or (not ast)
+          (not= (type ast) :table)
+          (= (type (. ast 1)) :string))
+      []
+      ;; else
+      (let [res (cool? ast)]
+        (if res
+          [res]
+          ;; else
+          (let [children []]
+            (each [_ sub-ast (ipairs ast)]
+              (let [sub-finds (deep-find sub-ast cool? (+ depth 1))]
+                (icollect [_ v (ipairs sub-finds) &into children]
+                  v)))
+            children)))))
+  (let [{: ast} (state.get-by-uri self uri)
+        threadings (deep-find
+                     ast
+                     #(case $1
+                        ;; TODO: make configurable?
+                        ;; TODO: make index calculation a function?
+                        [[:->   & _] _ & instructions] {:i 1  : instructions}
+                        [[:-?>  & _] _ & instructions] {:i 1  : instructions}
+                        [[:doto & _] _ & instructions] {:i 1  : instructions}
+                        [[:->>  & _] _ & instructions] {:i -1 : instructions}
+                        [[:-?>> & _] _ & instructions] {:i -1 : instructions}
+                        _ nil))]
+    (let [res []]
+      (each [_ {: i : instructions} (ipairs threadings)]
+        (icollect [_ instruction (ipairs instructions) &into res]
+          (let [index (case i
+                        (where pos (> pos 0)) pos
+                        (where neg (< neg 0)) (+ (length instruction)
+                                                 1
+                                                 neg))
+                after (. instruction index)]
+            (case after
+              (where node
+                     (= (type node) :table))
+              {:position {:line (- node.endline 1)
+                          :character (+ node.endcol 1)}
+               :label "$"
+               :kind 2
+               :paddingLeft true}
+              ;; TODO: handle literals (no position info in AST)
+              _ nil))))
+      res)))
 
 (fn pos<= [pos-1 pos-2]
   (or (< pos-1.line pos-2.line)
