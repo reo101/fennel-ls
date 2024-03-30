@@ -185,6 +185,14 @@ WARNING: this is only used in the test code, not in the real language server"
   (icollect [m (str:gmatch "[^ ]+")]
     m))
 
+(λ eprintln [?tbl]
+  "Pretty-print a table on stderr, used for debugging"
+  (let [inspect (require :inspect)]
+    (io.stderr:write
+      (string.format
+        "%s\n"
+        (inspect ?tbl)))))
+
 {: uri->path
  : path->uri
  : pos->position
@@ -197,4 +205,5 @@ WARNING: this is only used in the test code, not in the real language server"
  : get-ast-info
  : uniq-by
  : type=
- : split-spaces}
+ : split-spaces
+ : eprintln}
