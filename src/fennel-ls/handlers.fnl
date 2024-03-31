@@ -235,7 +235,9 @@ Every time the client sends a message, it gets handled by a function in the corr
       ;; bottom of ast
       (or (not ast)
           (not= (type ast) :table)
-          (= (type (. ast 1)) :string))
+          ;; TODO: literals
+          (and (= (type (. ast 1)) :string)
+               (. ast :line)))
       []
       ;; else
       (let [res (cool? ast)]
