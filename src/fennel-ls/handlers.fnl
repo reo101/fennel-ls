@@ -256,21 +256,21 @@ Every time the client sends a message, it gets handled by a function in the corr
                      #(case $1
                         ;; TODO: make configurable?
                         ;; TODO: make index calculation a function?
-                        [[:->   & _] _ & instructions] {:i 1  : instructions}
-                        [[:-?>  & _] _ & instructions] {:i 1  : instructions}
-                        [[:doto & _] _ & instructions] {:i 1  : instructions}
-                        [[:->>  & _] _ & instructions] {:i -1 : instructions}
-                        [[:-?>> & _] _ & instructions] {:i -1 : instructions}
+                        [[:->   & _] _ & steps] {:i 1  : steps}
+                        [[:-?>  & _] _ & steps] {:i 1  : steps}
+                        [[:doto & _] _ & steps] {:i 1  : steps}
+                        [[:->>  & _] _ & steps] {:i -1 : steps}
+                        [[:-?>> & _] _ & steps] {:i -1 : steps}
                         _ nil))]
     (let [res []]
-      (each [_ {: i : instructions} (ipairs threadings)]
-        (icollect [_ instruction (ipairs instructions) &into res]
+      (each [_ {: i : steps} (ipairs threadings)]
+        (icollect [_ step (ipairs steps) &into res]
           (let [index (case i
                         (where pos (> pos 0)) pos
-                        (where neg (< neg 0)) (+ (length instruction)
+                        (where neg (< neg 0)) (+ (length step)
                                                  1
                                                  neg))
-                after (. instruction index)]
+                after (. step index)]
             (case after
               (where node
                      (= (type node) :table))
