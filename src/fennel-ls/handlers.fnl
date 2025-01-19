@@ -234,10 +234,10 @@ Every time the client sends a message, it gets handled by a function in the corr
     (if
       ;; bottom of ast
       (or (not ast)
-          (not= (type ast) :table)
+          (not= (type ast) :table))
           ;; TODO: literals
-          (and (= (type (. ast 1)) :string)
-               (. ast :line)))
+          ; (and (= (type (. ast 1)) :string)
+          ;      (. ast :line)))
       []
       ;; else
       (let [res (cool? ast)]
@@ -270,17 +270,30 @@ Every time the client sends a message, it gets handled by a function in the corr
                         (where neg (< neg 0)) (+ (length step)
                                                  1
                                                  neg))
-                after (. step index)]
-            (case after
-              (where node
-                     (= (type node) :table))
-              {:position {:line (- node.endline 1)
-                          :character (+ node.endcol 1)}
-               :label "$"
-               :kind 2
-               :paddingLeft true}
-              ;; TODO: handle literals (no position info in AST)
-              _ nil))))
+                after (. step index)
+                hints (case after
+                         (where node
+                                (= (type node) :table))
+                         [{:position {:line (- node.endline 1)
+                                      :character (+ node.endcol 1)}
+                           :label "$"
+                           :kind 2
+                           :paddingLeft true}]
+                         ;; NOTE: just string, no list
+                         _
+                         [{:position {:line (- step.line 1)
+                                      :character step.col}
+                           :label "("
+                           :kind 2}
+                          {:position {:line (- step.endline 1)
+                                      :character (+ step.endcol 1)}
+                           :label "$)"
+                           :kind 2
+                           :paddingLeft true}]
+                         ;; TODO: handle literals (no position info in AST)
+                         _
+                         [])]
+              (icollect [_ v (ipairs hints) &into res] v))))
       res)))
 
 (fn pos<= [pos-1 pos-2]
